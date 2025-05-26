@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartBiz Tracker</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f7fa;
+      color: #333;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    h1 {
+      color: #4CAF50;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 10px;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    section {
+      margin: 20px 0;
+    }
+    #records-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    #records-table th, #records-table td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    #summary {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>SmartBiz Tracker</h1>
+    <p>Track income and expenses with voice and photo input</p>
+    <button onclick="startVoiceInput()">🎙️ Add by Voice</button>
+    <button onclick="document.getElementById('photo-input').click()">📸 Add by Photo</button>
+    <input type="file" id="photo-input" accept="image/*" style="display: none;" onchange="handlePhoto(event)">
+  </header>
+
+  <section>
+    <h2>Transcription Result</h2>
+    <p id="voice-result">(Waiting for voice input...)</p>
+  </section>
+
+  <section>
+    <h2>Transaction Records</h2>
+    <table id="records-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Amount</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody id="records-body">
+      </tbody>
+    </table>
+    <div id="summary"></div>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+  <script>
+    const records = [];
+
+    function updateTable() {
+      const tbody = document.getElementById("records-body");
+      tbody.innerHTML = "";
+      let income = 0, expense = 0;
+      records.forEach(record => {
+        const row = `<tr>
+          <td>${record.date}</td>
+          <td>${record.type}</td>
+          <td>${record.amount}</td>
+          <td>${record.description}</td>
+        </tr>`;
+        tbody.innerHTML += row;
+        if (record.type === 'Income') income += record.amount;
+        else expense += record.amount;
+      });
+      document.getElementById("summary").innerText = `Total Income: ${income}, Total Expense: ${expense}, Profit: ${income - expense}`;
+    }
+
+    function addRecord(type, amount, description) {
+      records.push({
+        date: new Date().toLocaleDateString(),
+        type,
+        amount: parseFloat(amount),
+        description
+      });
+      updateTable();
+    }
+
+    function startVoiceInput() {
+      const recognition = new(window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'en-US';
+      recognition.start();
+
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById("voice-result").innerText = transcript;
+
+        // Simple extraction (very basic!)
+        const amountMatch = transcript.match(/\d+/);
+        const isExpense = transcript.toLowerCase().includes("spent") || transcript.toLowerCase().includes("bought");
+
+        if (amountMatch) {
+          const amount = amountMatch[0];
+          const type = isExpense ? "Expense" : "Income";
+          addRecord(type, amount, transcript);
+        }
+      };
+    }
+
+    function handlePhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      Tesseract.recognize(
+        file,
+        'eng',
+        { logger: m => console.log(m) }
+      ).then(({ data: { text } }) => {
+        document.getElementById("voice-result").innerText = text;
+
+        const amountMatch = text.match(/\d+/);
+        const isExpense = text.toLowerCase().includes("spent") || text.toLowerCase().includes("total");
+
+        if (amountMatch) {
+          const amount = amountMatch[0];
+          const type = isExpense ? "Expense" : "Income";
+          addRecord(type, amount, text);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
